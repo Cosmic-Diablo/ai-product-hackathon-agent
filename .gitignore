@@ -1,0 +1,26 @@
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.vercel
+.netlify
+
+# IDE & OS files
+.DS_Store
+Thumbs.db
+*.log
