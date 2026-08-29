@@ -15,7 +15,7 @@ export async function analyzeReturnVision(
   if (genAI && apiKey) {
     try {
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.6-flash",
         generationConfig: {
           responseMimeType: "application/json",
           temperature: 0.1,
