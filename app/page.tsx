@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
 import { Navbar } from "@/components/Navbar";
 import { FluidBackground } from "@/components/FluidBackground";
+import { StorefrontView } from "@/components/StorefrontView";
 import { ShopperPortal } from "@/components/ShopperPortal";
 import { AgentThoughtStream } from "@/components/AgentThoughtStream";
 import { ReturnIntelligenceMemory } from "@/components/ReturnIntelligenceMemory";
@@ -11,12 +12,14 @@ import { ROIDashboard } from "@/components/ROIDashboard";
 import { ActionVerificationModal } from "@/components/ActionVerificationModal";
 import { PRESET_SCENARIOS, PresetScenario, INITIAL_BATCH_TELEMETRY, INITIAL_OPERATIONAL_METRICS } from "@/lib/mockData";
 import { ReturnRequest, AgentTriageResponse, BatchRiskTelemetry, OperationalImpactMetrics } from "@/lib/types";
+import { ArrowLeft, Sparkles, Columns, ShoppingBag } from "lucide-react";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"simulator" | "memory" | "analytics">("simulator");
+  const [activeTab, setActiveTab] = useState<"storefront" | "split" | "memory" | "analytics">("split");
   const [selectedScenario, setSelectedScenario] = useState<PresetScenario>(PRESET_SCENARIOS[0]);
   const [returnRequest, setReturnRequest] = useState<ReturnRequest>({ ...PRESET_SCENARIOS[0].request });
   const [judgeEmail, setJudgeEmail] = useState<string>("");
+  const [customImageBase64, setCustomImageBase64] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [agentResponse, setAgentResponse] = useState<AgentTriageResponse | null>(null);
 
@@ -26,7 +29,6 @@ export default function Home() {
 
   const [modalType, setModalType] = useState<"email" | "quarantine" | "vendor" | null>(null);
 
-  // Fetch telemetry state on mount
   useEffect(() => {
     fetchMemoryState();
   }, []);
@@ -44,9 +46,11 @@ export default function Home() {
     }
   };
 
-  const handleRunAgent = async () => {
+  const handleRunAgent = async (overrideBase64?: string) => {
     setIsProcessing(true);
     setAgentResponse(null);
+
+    const imageToSend = overrideBase64 || customImageBase64 || undefined;
 
     try {
       const res = await fetch("/api/agent/triage", {
@@ -55,7 +59,7 @@ export default function Home() {
         body: JSON.stringify({
           returnRequest,
           judgeEmail,
-          imageBase64: undefined,
+          imageBase64: imageToSend,
         }),
       });
 
@@ -63,7 +67,6 @@ export default function Home() {
         const data: AgentTriageResponse = await res.json();
         setAgentResponse(data);
 
-        // Update local batch telemetry & metrics immediately
         setBatches((prev) => ({
           ...prev,
           [data.batchTelemetry.batchId]: data.batchTelemetry,
@@ -76,10 +79,9 @@ export default function Home() {
           unitsQuarantinedCount: prev.unitsQuarantinedCount + (data.batchTelemetry.isQuarantined ? data.batchTelemetry.quarantinedUnitsCount : 0),
         }));
 
-        // Trigger confetti celebration on verified positive resolution
         confetti({
-          particleCount: 50,
-          spread: 60,
+          particleCount: 60,
+          spread: 70,
           origin: { y: 0.7 },
           colors: ["#06b6d4", "#3b82f6", "#10b981"],
         });
@@ -89,6 +91,13 @@ export default function Home() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleSelectOrderFromStorefront = (scenario: PresetScenario) => {
+    setSelectedScenario(scenario);
+    setReturnRequest({ ...scenario.request });
+    setCustomImageBase64("");
+    setActiveTab("split");
   };
 
   const handleResetMemory = async () => {
@@ -135,7 +144,6 @@ export default function Home() {
     <div className="relative min-h-screen pb-16">
       <FluidBackground />
 
-      {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -144,7 +152,6 @@ export default function Home() {
         isResetting={isResetting}
       />
 
-      {/* Main Container */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 space-y-8">
         {/* Top Flagship Pitch Hook */}
         <div className="text-center max-w-3xl mx-auto space-y-2">
@@ -160,53 +167,84 @@ export default function Home() {
           </p>
         </div>
 
-        {/* TAB 1: LIVE SIMULATOR (Scenes 1 & 2) */}
-        {activeTab === "simulator" && (
-          <div className="space-y-8">
-            {/* Scene 1: Customer Filing */}
-            <ShopperPortal
-              selectedScenario={selectedScenario}
-              onSelectScenario={setSelectedScenario}
-              returnRequest={returnRequest}
-              setReturnRequest={setReturnRequest}
-              judgeEmail={judgeEmail}
-              setJudgeEmail={setJudgeEmail}
-              onRunAgent={handleRunAgent}
-              isProcessing={isProcessing}
-              onQuickRunScenario={(scenario) => {
-                setSelectedScenario(scenario);
-                setReturnRequest({ ...scenario.request });
-                setTimeout(() => handleRunAgent(), 100);
-              }}
-            />
-
-            {/* Scene 2 & 3: Agent Live Stream & Tool Actions */}
-            <AgentThoughtStream
-              response={agentResponse}
-              isProcessing={isProcessing}
-              onOpenModal={(type) => setModalType(type)}
+        {/* TAB 1: DUMMY STOREFRONT (Customer POV) */}
+        {activeTab === "storefront" && (
+          <div className="space-y-6">
+            <StorefrontView
+              onSelectOrderToReturn={handleSelectOrderFromStorefront}
+              activeScenarioId={selectedScenario.id}
             />
           </div>
         )}
 
-        {/* TAB 2: RETURN INTELLIGENCE MEMORY */}
+        {/* TAB 2: LIVE SPLIT DEMO (Presentation Mode) */}
+        {activeTab === "split" && (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-gradient-to-r from-[#0c1628] to-[#09101f] border border-cyan-500/30 text-xs">
+              <div className="flex items-center gap-2 text-cyan-300">
+                <Columns className="w-4 h-4 text-cyan-400" />
+                <span><strong>Presentation Mode:</strong> Customer Experience on Left • Agent Brain & Tool Execution on Right</span>
+              </div>
+              <button
+                onClick={() => setActiveTab("storefront")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 transition-colors font-medium text-[11px]"
+              >
+                <ShoppingBag className="w-3 h-3" />
+                <span>View Full Storefront</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+              {/* LEFT COLUMN: Customer POV / Shopper Portal */}
+              <div className="xl:col-span-6">
+                <ShopperPortal
+                  selectedScenario={selectedScenario}
+                  onSelectScenario={setSelectedScenario}
+                  returnRequest={returnRequest}
+                  setReturnRequest={setReturnRequest}
+                  judgeEmail={judgeEmail}
+                  setJudgeEmail={setJudgeEmail}
+                  onRunAgent={handleRunAgent}
+                  isProcessing={isProcessing}
+                  onQuickRunScenario={(scenario) => {
+                    setSelectedScenario(scenario);
+                    setReturnRequest({ ...scenario.request });
+                    setTimeout(() => handleRunAgent(), 100);
+                  }}
+                  customImageBase64={customImageBase64}
+                  setCustomImageBase64={setCustomImageBase64}
+                />
+              </div>
+
+              {/* RIGHT COLUMN: Merchant AI Brain & Tool Execution */}
+              <div className="xl:col-span-6">
+                <AgentThoughtStream
+                  response={agentResponse}
+                  isProcessing={isProcessing}
+                  onOpenModal={(type) => setModalType(type)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: RETURN INTELLIGENCE MEMORY */}
         {activeTab === "memory" && (
           <ReturnIntelligenceMemory
             batches={batches}
             onToggleQuarantine={handleToggleQuarantine}
             onSimulateDefectCluster={(batchId) => {
-              // Quick trigger for sole defect
               const scenario = PRESET_SCENARIOS[0];
               setSelectedScenario(scenario);
               setReturnRequest({ ...scenario.request });
-              setActiveTab("simulator");
+              setActiveTab("split");
               setTimeout(() => handleRunAgent(), 150);
             }}
             isProcessing={isProcessing}
           />
         )}
 
-        {/* TAB 3: ROI COMMAND CENTER */}
+        {/* TAB 4: ROI COMMAND CENTER */}
         {activeTab === "analytics" && (
           <ROIDashboard
             metrics={metrics}
@@ -215,7 +253,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* Action Verification Modal */}
       <ActionVerificationModal
         modalType={modalType}
         onClose={() => setModalType(null)}
